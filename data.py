@@ -171,6 +171,8 @@ data_reduced_standarized.to_csv('case_zonas-valor-reduzido-std.csv')
 
 #%%
 # 3. Eigenvalues and eigenvectors
+data_reduced_standarized = pd.read_csv('case_zonas-valor-reduzido-std.csv')
+corr = data_reduced_standarized.corr()
 eig_vals, eig_vecs = np.linalg.eig(corr)
 
 print('Eigenvectors \n%s' %eig_vecs)
@@ -198,24 +200,26 @@ cum_var_exp = np.cumsum(var_exp)
 
 x = [i for i in range(1,eig_vals.size+1)]
 y = var_exp
-threshold = [95 for i in range(1,eig_vals.size+1)] # arbitrario
+threshold = [85 for i in range(1,eig_vals.size+1)] # arbitrario
+plt.figure(figsize=(8,5))
 plt.bar(x,y)
 plt.plot(x,cum_var_exp, c='green')
 plt.plot(x,threshold, c='red')
 plt.xlabel('Principal Components')
 plt.ylabel('Explained variance in percent')
+plt.legend(['Data','Cumulative', 'Threshold'])
 plt.show()
 
 # Conclui-se que 12 features ja representam 95% das informações contidas
 #%%
 # 4. Apply the PCE for 12 features
-
-n = 12
+data_reduced_standarized = pd.read_csv('case_zonas-valor-reduzido-std.csv')
+n = 5
 sklearn_pca = sklearnPCA(n_components=n)
 data_PCA = sklearn_pca.fit_transform(data_reduced_standarized)
 pca_header = ['PC_%s' %i for i in range(1,n+1)]
 data_PCA = pd.DataFrame(data_PCA, columns=pca_header)
-data_PCA.to_csv('case_zonas-valor-reduzido-PCA.csv')
+data_PCA.to_csv('case_zonas-valor-reduzido-PCA-'+str(n)+'.csv')
 corr2 = data_PCA.corr()
 
 plt.figure(figsize=(16,9))
@@ -230,9 +234,47 @@ ax.set_xticklabels(
     rotation=45,
     horizontalalignment='right'
 )
+plt.show()
 
-#%% 
-# 5. unsupervised learning KNN algorithm
+#%%  NEW FILE
+# 5. unsupervised learning - clustering algorithm K-means
+from sklearn.cluster import KMeans
+#load data
+data_PCA = pd.read_csv('case_zonas-valor-reduzido-PCA-'+str(n)+'.csv') 
+# Sao paulo possui cerca de 800 bairros em 96 distritos (wikipedia)
+n_clusters = [10*i for i in np.arange(1,11)]
+X = data_PCA
+
+# hyperparametric analysis: plot SSE vs num_clusters (elbow criterion for choosing k)
+sse = {}
+for k in n_clusters:
+    kmeans = KMeans(n_clusters=k, init='k-means++').fit(X)
+    data_PCA["clusters"] = kmeans.labels_
+    # Inertia: Sum of distances of samples to their closest cluster center
+    sse[k] = kmeans.inertia_ 
+plt.figure(figsize=(8,5))
+plt.plot(list(sse.keys()), list(sse.values()))
+plt.xlabel("Number of cluster")
+plt.ylabel("SSE")
+plt.show()
+
+#%%
+data_reduced = pd.read_csv('case_zonas-valor-reduzido.csv')
+x_column = 'longitude'
+y_column = 'latitude'
+x = data_reduced[x_column].astype(float)
+y = data_reduced[y_column].astype(float)
+colors = kmeans.labels_
+# setup the plot
+fig, ax = plt.subplots(1,1, figsize=(16,9))
+
+scatter = ax.scatter(x, y, c=colors, alpha=0.3 ,edgecolors='none')
+plt.xlabel(x_column)
+plt.ylabel(y_column)
+plt.show()
+    
+
+
 
 
 
