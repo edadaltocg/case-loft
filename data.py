@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 Created on Tue Aug 20 03:17:21 2019
 
@@ -238,7 +238,7 @@ plt.show()
 n = 12
 data_reduced = pd.read_csv('case_zonas-valor-reduzido.csv')
 data_reduced = data_reduced.drop(columns=['Unnamed: 0'])
-data_reduced_sampled = data_reduced.sample(frac = 0.01)
+data_reduced_sampled = data_reduced.sample(frac = 0.1)
 data_reduced_sampled.to_csv('data-reduced-sampled.csv')
 header = list(data_reduced.columns.values)
 data_reduced_values = data_reduced_sampled.astype(float)
