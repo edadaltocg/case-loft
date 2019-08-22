@@ -7,12 +7,12 @@ Created on Tue Aug 20 03:17:21 2019
 #%% Importing libraries
 import pandas as pd
 import numpy as np
-#import sklearn as sk
 from sklearn import preprocessing
 from sklearn.decomposition import PCA as sklearnPCA
-import matplotlib
+from sklearn.mixture import GaussianMixture
 import matplotlib.pyplot as plt
 import seaborn as sns
+
 #%% Reading file 
 data = pd.read_csv("case_zonas-valor.csv") 
 # first lines
@@ -37,10 +37,6 @@ print(data.iloc[0,10])
 # drop a column
 minimal = data.drop(columns=['bairro_do_imovel', 'referencia_do_imovel']) # NULL
 
-#%%
-# TO DO:
-# 1. Plot inicial com os bairros dos imoveis: grafico 2D (lat, long) com legenda de bairro (clusters)
-# 2. K-Nearest Neighbors algorithm com features restantes. Encontrar o valor ideal de K.
 #%%
 # Reducing data
 data_reduced = data.drop(columns=['numero_do_contribuinte','numero_do_condominio', 
@@ -137,7 +133,6 @@ plt.ylabel(y_column)
 plt.show()
 
 #%% Reducing dimension
-# PCA - Principal Component Analysis
 #1. Standarization
 data_reduced_values = data_reduced.astype(float)
 
@@ -163,8 +158,6 @@ ax.set_xticklabels(
 data_reduced_standarized = data_reduced_standarized.drop(columns=['ano_da_construcao_corrigido'])
 corr = data_reduced_standarized.corr()
 data_reduced_standarized.to_csv('case_zonas-valor-reduzido-std.csv')
-#figure = ax.get_figure()    
-#figure.savefig('corr_heatmap.png', dpi=400)
         
 # Observa-se uma forte correlação entre o ano do imóvele o faotr de obsolescencia
 # Opta-se por remover o ano do terreno (diminuir 1 dimensão)
@@ -180,7 +173,7 @@ print('\nEigenvalues \n%s' %eig_vals)
 
 for ev in eig_vecs:
     np.testing.assert_array_almost_equal(1.0, np.linalg.norm(ev))
-print('Everything ok!')
+print('Tudo certo!')
 
 # Make a list of (eigenvalue, eigenvector) tuples
 eig_pairs = [(np.abs(eig_vals[i]), eig_vecs[:,i]) for i in range(len(eig_vals))]
@@ -190,7 +183,7 @@ eig_pairs.sort()
 eig_pairs.reverse()
 
 # Visually confirm that the list is correctly sorted by decreasing eigenvalues
-print('Eigenvalues in descending order:')
+print('Autovalores em ordem decrescente:')
 for i in eig_pairs:
     print(i[0])
     
@@ -200,21 +193,21 @@ cum_var_exp = np.cumsum(var_exp)
 
 x = [i for i in range(1,eig_vals.size+1)]
 y = var_exp
-threshold = [85 for i in range(1,eig_vals.size+1)] # arbitrario
+threshold = [95 for i in range(1,eig_vals.size+1)] # arbitrario
 plt.figure(figsize=(8,5))
 plt.bar(x,y)
 plt.plot(x,cum_var_exp, c='green')
 plt.plot(x,threshold, c='red')
 plt.xlabel('Principal Components')
 plt.ylabel('Explained variance in percent')
-plt.legend(['Data','Cumulative', 'Threshold'])
+plt.legend(['Threshold','Cumulative', 'Data'])
 plt.show()
 
 # Conclui-se que 12 features ja representam 95% das informações contidas
 #%%
-# 4. Apply the PCE for 12 features
+# 4. Apply the PCA for 12 features
 data_reduced_standarized = pd.read_csv('case_zonas-valor-reduzido-std.csv')
-n = 5
+n = 12
 sklearn_pca = sklearnPCA(n_components=n)
 data_PCA = sklearn_pca.fit_transform(data_reduced_standarized)
 pca_header = ['PC_%s' %i for i in range(1,n+1)]
@@ -236,103 +229,61 @@ ax.set_xticklabels(
 )
 plt.show()
 
-#%%  NEW FILE
-# 5. unsupervised learning - clustering algorithm K-means
-from sklearn.cluster import KMeans
-#load data
-data_PCA = pd.read_csv('case_zonas-valor-reduzido-PCA-'+str(n)+'.csv') 
-# Sao paulo possui cerca de 800 bairros em 96 distritos (wikipedia)
-n_clusters = [10*i for i in np.arange(1,11)]
-X = data_PCA
-
-# hyperparametric analysis: plot SSE vs num_clusters (elbow criterion for choosing k)
-sse = {}
-for k in n_clusters:
-    kmeans = KMeans(n_clusters=k, init='k-means++').fit(X)
-    data_PCA["clusters"] = kmeans.labels_
-    # Inertia: Sum of distances of samples to their closest cluster center
-    sse[k] = kmeans.inertia_ 
-plt.figure(figsize=(8,5))
-plt.plot(list(sse.keys()), list(sse.values()))
-plt.xlabel("Number of cluster")
-plt.ylabel("SSE")
-plt.show()
 
 #%%
+# 5. Gaussian MIXTURE
+#The optimal number of clusters (K) is the value that minimizes the
+# Akaike information criterion (AIC) or the Bayesian information criterion (BIC).
+
+n = 12
 data_reduced = pd.read_csv('case_zonas-valor-reduzido.csv')
-x_column = 'longitude'
-y_column = 'latitude'
-x = data_reduced[x_column].astype(float)
-y = data_reduced[y_column].astype(float)
-colors = kmeans.labels_
-# setup the plot
-fig, ax = plt.subplots(1,1, figsize=(16,9))
+data_reduced = data_reduced.drop(columns=['Unnamed: 0'])
+data_reduced_sampled = data_reduced.sample(frac = 0.1)
+data_reduced_sampled.to_csv('data-reduced-sampled.csv')
+header = list(data_reduced.columns.values)
+data_reduced_values = data_reduced_sampled.astype(float)
+scaler = preprocessing.StandardScaler()
+data_standarized = scaler.fit_transform(data_reduced_values)
+data_reduced_standarized = pd.DataFrame(data_standarized, columns=header)
 
-scatter = ax.scatter(x, y, c=colors, alpha=0.3 ,edgecolors='none')
-plt.xlabel(x_column)
-plt.ylabel(y_column)
-plt.show()
-    
+sklearn_pca = sklearnPCA(n_components=n)
+data_PCA = sklearn_pca.fit_transform(data_reduced_standarized)
+pca_header = ['PC_%s' %i for i in range(1,n+1)]
+data_PCA_sampled = pd.DataFrame(data_PCA, columns=pca_header)
 
+X = data_PCA_sampled
+n_components = np.arange(140, 160,1)
+MC = 10
+y_bic_means = np.empty([MC,n_components.size])
+y_aic_means = np.empty([MC,n_components.size])
 
+for i in np.arange(0,MC):
+    models = [GaussianMixture(n, covariance_type='full', random_state=0).fit(X) for n in n_components]
+    y_bic_means[i,:] = np.array([m.bic(X) for m in models])
+    y_aic_means[i,:] = np.array([m.aic(X) for m in models])
 
+plt.figure(figsize=(15,8))
+plt.plot(n_components, np.mean(y_bic_means,0), label='BIC')
+plt.plot(n_components, np.mean(y_aic_means,0), label='AIC')
+plt.legend(loc='best')
+plt.xlabel('n_components');
 
-
-#%%
-'''
-#target = 'valor_do_m2_de_construcao'
-#print(data_reduced[target].astype(float))
-#plt.figure(1)
-#plt.hist(data_reduced[target].astype(float), bins=25)
-x_column = 'longitude'
-y_column = 'latitude'
-x = data_reduced[x_column].astype(float)
-y = data_reduced[y_column].astype(float)
-label = data_reduced['bairro_do_imovel'].unique()
-legend = data_reduced['bairro_do_imovel']
-N = label.size # Number of labels
-tag = data_reduced['bairro_do_imovel']
-i = 0
-d = np.empty(N)
-for string in label:
-    d[i] = int(i)
-    i += 1
- 
-i = 0
-for string in label:
-    test = data_reduced['bairro_do_imovel']==string
-    indices = [j for j, x in enumerate(legend) if x == string]
-    if test:
-        legend.where(string) = d[i]
-    i += 1
+#plt.plot(n_components, [m.bic(X) for m in models], label='BIC')
 
 
+#%% Define labels
+# escolha de 150 bairros 
+n = 12
+data_PCA = pd.read_csv('case_zonas-valor-reduzido-PCA-'+str(n)+'.csv') 
+data_PCA = data_PCA.drop(columns=['Unnamed: 0'])
+n_components = 150
+X = data_PCA
+#model = GaussianMixture(n_components=n_components, covariance_type='full', random_state=0).fit(X)
+gmm = GaussianMixture(n_components=n_components)
+gmm.fit(X)
+labels = gmm.predict(X)
+data_reduced['labels'] = labels
+data_reduced.to_csv('novos-bairros.csv')
+plt.scatter(data_reduced['longitude'], data_reduced['latitude'], c=labels, cmap='viridis');
 
-mylegend = data_reduced['bairro_do_imovel'];
-print(mylegend.unique().size)
-color = np.random.randint(1, mylegend.unique().size, size=mylegend.size)
-# setup the plot
-fig, ax = plt.subplots(1,1, figsize=(6,6))
-
-scatter = ax.scatter(data_reduced[x].astype(float), data_reduced[y].astype(float),
-                     c=color, cmap=matplotlib.colors.ListedColormap(color), alpha=0.3, edgecolors='none')
-# produce a legend with the unique colors from the scatter
-legend1 = ax.legend(mylegend.unique(),
-                    loc="lower left", title="Classes")
-ax.add_artist(legend1)
-
-plt.show()
-
-print(numpy_data.shape)
-#test = map(lambda s: s.replace(',' , '.'), numpy_data)
-string_data = np.char.replace(string_data, ',', '.')
-numpy_data_2 = np.array((string_data))
-print (string_data)
-#print( np.where(np.equal(string_data[:,0],"PESSOA FISICA (CPF)")))
-dic = {
-       "Apartamento em condomÃ­nio": 0,
-       "Flat de uso comercial (semelhante a hotel)": 1,
-                   "bla": 2
-       }
-'''
 
