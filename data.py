@@ -200,7 +200,7 @@ plt.plot(x,cum_var_exp, c='green')
 plt.plot(x,threshold, c='red')
 plt.xlabel('Principal Components')
 plt.ylabel('Explained variance in percent')
-plt.legend(['Threshold','Cumulative', 'Data'])
+plt.legend(['Cumulative','Threshold', 'Data'])
 plt.show()
 
 # Conclui-se que 12 features ja representam 95% das informações contidas
@@ -238,7 +238,7 @@ plt.show()
 n = 12
 data_reduced = pd.read_csv('case_zonas-valor-reduzido.csv')
 data_reduced = data_reduced.drop(columns=['Unnamed: 0'])
-data_reduced_sampled = data_reduced.sample(frac = 0.1)
+data_reduced_sampled = data_reduced.sample(frac = 0.01)
 data_reduced_sampled.to_csv('data-reduced-sampled.csv')
 header = list(data_reduced.columns.values)
 data_reduced_values = data_reduced_sampled.astype(float)
@@ -252,8 +252,8 @@ pca_header = ['PC_%s' %i for i in range(1,n+1)]
 data_PCA_sampled = pd.DataFrame(data_PCA, columns=pca_header)
 
 X = data_PCA_sampled
-n_components = np.arange(140, 160,1)
-MC = 10
+n_components = np.arange(100, 100,10)
+MC = 1
 y_bic_means = np.empty([MC,n_components.size])
 y_aic_means = np.empty([MC,n_components.size])
 
@@ -266,24 +266,21 @@ plt.figure(figsize=(15,8))
 plt.plot(n_components, np.mean(y_bic_means,0), label='BIC')
 plt.plot(n_components, np.mean(y_aic_means,0), label='AIC')
 plt.legend(loc='best')
-plt.xlabel('n_components');
+plt.xlabel('n_components')
 
 #plt.plot(n_components, [m.bic(X) for m in models], label='BIC')
 
 
 #%% Define labels
 # escolha de 150 bairros 
-n = 12
-data_PCA = pd.read_csv('case_zonas-valor-reduzido-PCA-'+str(n)+'.csv') 
-data_PCA = data_PCA.drop(columns=['Unnamed: 0'])
 n_components = 150
-X = data_PCA
 #model = GaussianMixture(n_components=n_components, covariance_type='full', random_state=0).fit(X)
-gmm = GaussianMixture(n_components=n_components)
+gmm = GaussianMixture(n_components=n_components, covariance_type='full', random_state=0)
 gmm.fit(X)
 labels = gmm.predict(X)
-data_reduced['labels'] = labels
-data_reduced.to_csv('novos-bairros.csv')
-plt.scatter(data_reduced['longitude'], data_reduced['latitude'], c=labels, cmap='viridis');
+data_reduced_sampled['labels'] = labels
+data_reduced_sampled.to_csv('novos-bairros-sampled-0_01.csv')
+plt.figure(figsize=(15,8))
+plt.scatter(data_reduced_sampled['longitude'], data_reduced_sampled['latitude'], c=labels, cmap='viridis')
 
 
